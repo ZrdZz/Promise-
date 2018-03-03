@@ -28,3 +28,5 @@ function Promise(fn){
   
   fn(resolve)
 }
+
+改好了
