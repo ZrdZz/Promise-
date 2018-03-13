@@ -3,11 +3,13 @@ function Promise(fn){
       value,
       state = 'pending';
   
-  this.then = function(onFulfilled){
-    return new Promise(function(resolve){
+  this.then = function(onFulfilled, onRejected){
+    return new Promise(function(resolve, reject){
         handle({
             onFulfilled = null,
-            resolve
+            onRejected = null,
+            resolve,
+            reject
         })
     })
   }
@@ -18,19 +20,29 @@ function Promise(fn){
         return 
     }
     
-    if(!callback.onFulfilled){
-        callback.resolve(value);
+    let cb = state === 'fulfilled' ? callback.onFulfilled : callback.onRejected,
+        ret;
+    
+    if(cb === null){
+        cb = state === 'fulfilled' ? callback.resolve : callback.reject;
+        cb(value);
+        return
     }
     
-    var ret = callback.onFulfilled(value);
-    callback.resolve(ret);
+    //执行成功回调或失败回调时出错将其捕获
+    try{
+        ret = cb(value);
+        callback.resolve(ret);
+    }catch(e){
+        callback.reject(e)
+    }
   }
   
   function resolve(newValue){
     if(newValue && (typeof newValue === 'object' || typeof newValue === 'function')){
         var then = newValue.then;
         if(typeof then === 'function'){
-            then.call(newValue, resolve);
+            then.call(newValue, resolve, reject);
             return;
         }
     }
@@ -39,11 +51,22 @@ function Promise(fn){
     state = 'fulfilled';
     
     setTimeout(function(){
-      callbacks.forEach(function(onFulfilled){
-        value = onFulfilled(value)
+      callbacks.forEach(function(callback){
+        handle(callback);
       })
     }, 0)
   }
+
+  function reject(newValue){
+    value = newValue;
+    state = 'rejected';
+
+    setTimeout(function(){
+      callbacks.forEach(function(callback){
+        handle(callback);
+      })
+    }, 0)
+  }
   
-  fn(resolve)
+  fn(resolve, reject);
 }
